@@ -1,7 +1,13 @@
-import numpy as np
-from scipy.spatial.distance import cdist
+import time
 import math
+import random
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.spatial.distance import cdist
 from functools import reduce
+from sklearn.decomposition import PCA
+from sklearn.metrics.cluster import normalized_mutual_info_score
 
 class KMeans():
 
@@ -123,51 +129,50 @@ class KMeans():
         self.totalObjectiveScores.append(self.currentObjectiveScore)
         self.totalIterations.append(count)
 
-        for cluster in clusters.keys():
-            if(cluster==0):
-                plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-                clusterX=[]
-                clusterY=[]
-                for point in clusters[cluster]:
-                    clusterX.append(point[0])
-                    clusterY.append(point[1])
-                plt.scatter(clusterX,clusterY,color='r')
-            elif(cluster==1):
-                plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-                clusterX=[]
-                clusterY=[]
-                for point in clusters[cluster]:
-                    clusterX.append(point[0])
-                    clusterY.append(point[1])
-                plt.scatter(clusterX,clusterY,color='g')
-            elif(cluster==2):
-                plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-                clusterX=[]
-                clusterY=[]
-                for point in clusters[cluster]:
-                    clusterX.append(point[0])
-                    clusterY.append(point[1])
-                plt.scatter(clusterX,clusterY,color='c')
-            else:
-                plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-                clusterX=[]
-                clusterY=[]
-                for point in clusters[cluster]:
-                    clusterX.append(point[0])
-                    clusterY.append(point[1])
-                plt.scatter(clusterX,clusterY,color='y')
-        plt.show()
-
+        # for cluster in clusters.keys():
+        #     if(cluster==0):
+        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
+        #         clusterX=[]
+        #         clusterY=[]
+        #         for point in clusters[cluster]:
+        #             clusterX.append(point[0])
+        #             clusterY.append(point[1])
+        #         plt.scatter(clusterX,clusterY,color='r')
+        #     elif(cluster==1):
+        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
+        #         clusterX=[]
+        #         clusterY=[]
+        #         for point in clusters[cluster]:
+        #             clusterX.append(point[0])
+        #             clusterY.append(point[1])
+        #         plt.scatter(clusterX,clusterY,color='g')
+        #     elif(cluster==2):
+        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
+        #         clusterX=[]
+        #         clusterY=[]
+        #         for point in clusters[cluster]:
+        #             clusterX.append(point[0])
+        #             clusterY.append(point[1])
+        #         plt.scatter(clusterX,clusterY,color='c')
+        #     else:
+        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
+        #         clusterX=[]
+        #         clusterY=[]
+        #         for point in clusters[cluster]:
+        #             clusterX.append(point[0])
+        #             clusterY.append(point[1])
+        #         plt.scatter(clusterX,clusterY,color='y')
+        # plt.show()
+        print('')
+        print('=================== K-Means Statistics ===================')
+        print("Number of iterations to converge: "+str(np.mean(a.getIterations())))
+        print("Clustering Objective O: "+str(np.mean(a.getObjectiveScores())))
+        print("Took %s seconds to complete (d=2)." % (time.time() - start_time))
+        print('==========================================================')
+        print('')
         return(centers, clusters)
 
-# Data loading code to help you get started
-import pandas as pd
-import random
-import matplotlib.pyplot as plt
-import numpy as np
-import time
-from sklearn.decomposition import PCA
-from sklearn.metrics.cluster import normalized_mutual_info_score
+
 
 arcene_df_train = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/'
                               + 'arcene/ARCENE/arcene_train.data',
@@ -178,12 +183,12 @@ arcene_train_labels = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learni
                               delim_whitespace=True,
                               header=None)
 
-arcene_train_labels_arr=[]
+#arcene_train_labels_arr=[]
 
-for label in arcene_train_labels.values:
-    arcene_train_labels_arr.append(label[0])
+#for label in arcene_train_labels.values:
+#    arcene_train_labels_arr.append(label[0])
 
-print("-------- No PCA -------- (all stats averaged over 100 runs)")
+
 arcene_train = pd.concat([arcene_df_train], ignore_index=True)
 arcene_arr_train = arcene_train.values
 
@@ -192,7 +197,4 @@ principalComponents = pca.fit_transform(arcene_arr_train)
 start_time = time.time()
 #print(principalComponents)
 a=KMeans()
-result=a.kmeans(principalComponents,25,1,'forgy')
-print("Number of iterations to converge: "+str(np.mean(a.getIterations())))
-print("Clustering Objective O: "+str(np.mean(a.getObjectiveScores())))
-print("Took %s seconds to complete (d=10)." % (time.time() - start_time))
+result=a.kmeans(principalComponents,4,1,'forgy')
