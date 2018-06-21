@@ -62,6 +62,7 @@ class KMeans():
         return max([(i[0], np.linalg.norm(center-data[i[0]])) for i in enumerate(data)], key=lambda t:t[1])[0]
 
     def kmeans(self, data, k, flag, init_flag):
+        start_time = time.time()
         # flag=1 for k means, flag=2 for k medians
         self.currentObjectiveScore=0
         self.cluster_labels=[]
@@ -129,72 +130,11 @@ class KMeans():
         self.totalObjectiveScores.append(self.currentObjectiveScore)
         self.totalIterations.append(count)
 
-        # for cluster in clusters.keys():
-        #     if(cluster==0):
-        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-        #         clusterX=[]
-        #         clusterY=[]
-        #         for point in clusters[cluster]:
-        #             clusterX.append(point[0])
-        #             clusterY.append(point[1])
-        #         plt.scatter(clusterX,clusterY,color='r')
-        #     elif(cluster==1):
-        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-        #         clusterX=[]
-        #         clusterY=[]
-        #         for point in clusters[cluster]:
-        #             clusterX.append(point[0])
-        #             clusterY.append(point[1])
-        #         plt.scatter(clusterX,clusterY,color='g')
-        #     elif(cluster==2):
-        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-        #         clusterX=[]
-        #         clusterY=[]
-        #         for point in clusters[cluster]:
-        #             clusterX.append(point[0])
-        #             clusterY.append(point[1])
-        #         plt.scatter(clusterX,clusterY,color='c')
-        #     else:
-        #         plt.scatter(centers[cluster][0],centers[cluster][1],marker='s',color='b')
-        #         clusterX=[]
-        #         clusterY=[]
-        #         for point in clusters[cluster]:
-        #             clusterX.append(point[0])
-        #             clusterY.append(point[1])
-        #         plt.scatter(clusterX,clusterY,color='y')
-        # plt.show()
         print('')
         print('=================== K-Means Statistics ===================')
-        print("Number of iterations to converge: "+str(np.mean(a.getIterations())))
-        print("Clustering Objective O: "+str(np.mean(a.getObjectiveScores())))
-        print("Took %s seconds to complete (d=2)." % (time.time() - start_time))
+        print("Number of iterations to converge: "+str(np.mean(self.totalIterations)))
+        print("Clustering Objective O: "+str(np.mean(self.totalObjectiveScores)))
+        print("Took %s seconds to complete (d=3)." % (time.time() - start_time))
         print('==========================================================')
         print('')
         return(centers, clusters)
-
-
-
-arcene_df_train = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/'
-                              + 'arcene/ARCENE/arcene_train.data',
-                              delim_whitespace=True,
-                              header=None)
-arcene_train_labels = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/'
-                              + 'arcene/ARCENE/arcene_train.labels',
-                              delim_whitespace=True,
-                              header=None)
-
-#arcene_train_labels_arr=[]
-
-#for label in arcene_train_labels.values:
-#    arcene_train_labels_arr.append(label[0])
-
-
-arcene_train = pd.concat([arcene_df_train], ignore_index=True)
-arcene_arr_train = arcene_train.values
-
-pca = PCA(n_components=2)
-principalComponents = pca.fit_transform(arcene_arr_train)
-start_time = time.time()
-#print(principalComponents)
-a=KMeans()
-result=a.kmeans(principalComponents,4,1,'forgy')
