@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 from matplotlib.text import Annotation
+import argparse
+
+clustering_algo=''
+args=()
 
 def generate_colors(n):
     ret = []
@@ -30,7 +34,7 @@ class SentimentCluster():
         self.k=k
         self.ie=InfersentEmbedding(500000, 'InferSent/dataset/GloVe/glove.840B.300d.txt', 'samples.txt')
         self.embeddings=self.ie.infersent_embed()
-        self.principal_components=self.ie.get_3d_data()
+        self.principal_components=self.ie.get_nd_data(3)
         self.perform_clustering()
         self.drawGraphs()
 
@@ -75,11 +79,22 @@ class SentimentCluster():
         plt.show()
 
     def perform_clustering(self):
-        a=KMeans()
-        self.results=a.kmeans(self.principal_components,self.k,1,'forgy')
+        if args.clustering_algo='kmeans':
+            a=KMeans()
+            self.results=a.kmeans(self.principal_components,self.k,1,'forgy')
+        elif args.clustering_algo="dbscan":
+            # TODO: implement DBSCAN if needed
+            return
 
 def main():
-    sc=SentimentCluster(3)
+    parser = argparse.ArgumentParser(description='Sentiment Cluster.')
+    parser.add_argument('clustering_algo', nargs='?', default='kmeans', help='Specify whether to use K-Means or DBSCAN clustering algorithm.')
+    parser.add_argument('k', nargs='?', default=3,help='Specify the number of clusters (k) for k-means.')
+    parser.add_argument('eps', nargs='?', default=3,help='Maximum distance for two samples to be in same cluster.')
+    parser.add_argument('min_size', nargs='?', default=3,help='Minimum cluster size for DBSCAN.')
+    args = parser.parse_args()
+
+    sc=SentimentCluster(args.k)
 
 if __name__== "__main__":
     main()
