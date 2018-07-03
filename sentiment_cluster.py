@@ -79,12 +79,12 @@ class SentimentCluster():
         plt.show()
 
     def perform_clustering(self):
-        if args.clustering_algo='kmeans':
-            a=KMeans()
-            self.results=a.kmeans(self.principal_components,self.k,1,'forgy')
-        elif args.clustering_algo="dbscan":
-            # TODO: implement DBSCAN if needed
-            return
+        #if args.clustering_algo=='kmeans':
+        a=KMeans()
+        self.results=a.kmeans(self.principal_components,self.k,1,'forgy')
+        #elif args.clustering_algo=="dbscan":
+        #    # TODO: implement DBSCAN if needed
+    #        return
 
 def main():
     parser = argparse.ArgumentParser(description='Sentiment Cluster.')

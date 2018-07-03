@@ -2,7 +2,6 @@ import time
 import math
 import random
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
 from functools import reduce
