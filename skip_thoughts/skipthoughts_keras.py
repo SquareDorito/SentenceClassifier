@@ -95,7 +95,7 @@ path_to_tables = 'data/'
 path_to_umodel = path_to_models + 'uni_skip.npz'
 path_to_bmodel = path_to_models + 'bi_skip.npz'
 
-a=SkipThoughts(500000,100,['bye bye!','Hello, my name is Ken.','Hello, my name is Bill.','The current president is Trump.','The former president is Barack Obama.'])
+a=SkipThoughts(500000,100,[])
 a.preprocess_text()
 a.build_encoder()
 a.build_decoder()
