@@ -9,8 +9,27 @@ from mpl_toolkits.mplot3d.proj3d import proj_transform
 from matplotlib.text import Annotation
 import argparse
 
-clustering_algo=''
-args=()
+from sklearn.decomposition import PCA
+import skip_thoughts.skipthoughts as skipthoughts
+
+class Annotation3D(Annotation):
+    '''Annotate the point xyz with text s'''
+
+    def __init__(self, s, xyz, *args, **kwargs):
+        Annotation.__init__(self,s, xy=(0,0), *args, **kwargs)
+        self._verts3d = xyz
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.xy=(xs,ys)
+        Annotation.draw(self, renderer)
+
+def annotate3D(ax, s, *args, **kwargs):
+    '''add anotation text s to to Axes3d ax'''
+
+    tag = Annotation3D(s, *args, **kwargs)
+    ax.add_artist(tag)
 
 def generate_colors(n):
     ret = []
@@ -28,15 +47,38 @@ def generate_colors(n):
         ret.append((r,g,b))
     return ret
 
-class SentimentCluster():
+class SemanticCluster():
 
-    def __init__(self,k):
-        self.k=k
-        self.ie=InfersentEmbedding(500000, 'InferSent/dataset/GloVe/glove.840B.300d.txt', 'samples.txt')
-        self.embeddings=self.ie.infersent_embed()
-        self.principal_components=self.ie.get_nd_data(3)
+    def __init__(self,args):
+        self.args=args
+
+        self.sentences=[]
+        with open('samples.txt') as f:
+            for line in f:
+                self.sentences.append(line.strip())
+
+        if self.args.embedding_algo=='infersent':
+            self.ie=InfersentEmbedding(500000, 'InferSent/dataset/GloVe/glove.840B.300d.txt',self.sentences)
+            self.embeddings=self.ie.infersent_embed()
+        elif self.args.embedding_algo=='skip_thoughts':
+            self.st_model = skipthoughts.load_model()
+            self.st_encoder = skipthoughts.Encoder(self.st_model)
+            self.embeddings=self.st_encoder.encode(self.sentences)
+        print('Done with embedding...starting clustering.')
+        self.principal_components=self.get_nd_data(3)
         self.perform_clustering()
         self.drawGraphs()
+
+    def get_nd_data(self, k):
+        pca = PCA(n_components=k)
+        principal_components=pca.fit_transform(self.embeddings)
+
+        with open('samples_output_pca3.txt', 'w') as f:
+            for pc in principal_components:
+                f.write('['+' '.join(str(x) for x in pc)+']')
+                f.write('\n')
+
+        return principal_components
 
     def drawGraphs(self):
         # ==============
@@ -60,9 +102,9 @@ class SentimentCluster():
         ax = fig.add_subplot(1, 2, 2, projection='3d')
         clusters=self.results[1]
         centers=self.results[0]
-        colors=generate_colors(self.k)
+        colors=generate_colors(int(self.args.k))
         colors=[(x[0]/255.0,x[1]/255.0,x[2]/255.0) for x in colors]
-        #print(colors)
+
         for i,cluster in enumerate(clusters.keys()):
             ax.scatter(centers[cluster][0],centers[cluster][1],centers[cluster][2],marker='^',color=colors[i])
             annotate3D(ax, s='Center '+str(i+1), xyz=(centers[cluster][0],centers[cluster][1],centers[cluster][2]), fontsize=10, xytext=(-2,2),
@@ -81,20 +123,21 @@ class SentimentCluster():
     def perform_clustering(self):
         #if args.clustering_algo=='kmeans':
         a=KMeans()
-        self.results=a.kmeans(self.principal_components,self.k,1,'forgy')
+        self.results=a.kmeans(self.principal_components,int(self.args.k),1,'forgy')
         #elif args.clustering_algo=="dbscan":
         #    # TODO: implement DBSCAN if needed
     #        return
 
 def main():
     parser = argparse.ArgumentParser(description='Sentiment Cluster.')
-    parser.add_argument('clustering_algo', nargs='?', default='kmeans', help='Specify whether to use K-Means or DBSCAN clustering algorithm.')
-    parser.add_argument('k', nargs='?', default=3,help='Specify the number of clusters (k) for k-means.')
-    parser.add_argument('eps', nargs='?', default=3,help='Maximum distance for two samples to be in same cluster.')
-    parser.add_argument('min_size', nargs='?', default=3,help='Minimum cluster size for DBSCAN.')
+    parser.add_argument('--clustering_algo', nargs='?', default='kmeans', help='Specify whether to use K-Means or DBSCAN clustering algorithm.')
+    parser.add_argument('--embedding_algo', nargs='?', default='skip_thoughts', help='Specify sentence embedding technique. Supported techniques: infersent, skip_thoughts.')
+    parser.add_argument('--k', nargs='?', default=3,help='Specify the number of clusters (k) for k-means.')
+    parser.add_argument('--eps', nargs='?', default=3,help='Maximum distance for two samples to be in same cluster.')
+    parser.add_argument('--min_size', nargs='?', default=3,help='Minimum cluster size for DBSCAN.')
     args = parser.parse_args()
+    sc=SemanticCluster(args)
 
-    sc=SentimentCluster(args.k)
 
 if __name__== "__main__":
     main()
