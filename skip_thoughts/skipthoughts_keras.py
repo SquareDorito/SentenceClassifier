@@ -17,6 +17,10 @@ from nltk.tokenize import word_tokenize
 
 profile=False
 
+
+import os
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
 import keras
 from keras.layers import Input, Embedding, GRU, LSTM, Dense, Bidirectional, BatchNormalization
 from keras.models import Sequential, Model, load_model
@@ -86,7 +90,14 @@ class SkipThoughts():
                   batch_size=self.batch_size,
                   epochs=10,
                   validation_split=0.3)
-        seq2seq_Model.save('my_model.h5')
+        model.save('my_model.h5')
+        headlines = tokenizer.texts_to_sequences(data['headline'].values)
+        headlines = pad_sequences(headlines,maxlen=maxlen)x = encoder_model.predict(headlines)
+
+        msk = np.random.rand(len(data)) < 0.8
+        X_train,y_train,X_test,y_test = x[msk],y[msk],x[~msk],y[~msk]
+        lr = LogisticRegression().fit(X_train,y_train)
+        lr.score(X_test,y_test)
 
 #-----------------------------------------------------------------------------#
 # Specify model and table locations here
