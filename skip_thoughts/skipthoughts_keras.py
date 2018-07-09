@@ -19,7 +19,7 @@ profile=False
 
 import keras
 from keras.layers import Input, Embedding, GRU, LSTM, Dense, Bidirectional, BatchNormalization
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras import optimizers
@@ -86,6 +86,7 @@ class SkipThoughts():
                   batch_size=self.batch_size,
                   epochs=10,
                   validation_split=0.3)
+        seq2seq_Model.save('my_model.h5')
 
 #-----------------------------------------------------------------------------#
 # Specify model and table locations here
