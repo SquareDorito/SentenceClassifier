@@ -48,6 +48,7 @@ encoder.load_model(configuration.model_config(),
 embeddings=[]
 
 if os.path.isfile('sample_output.txt'):
+    print('Found output file. Using saved encodings...')
     with open('sample_output.txt', 'r') as f:
         for line in f:
             temp=line.strip('[').strip(']').split(' ')
@@ -66,8 +67,7 @@ else:
     print(len(embeddings[0]))
     with open('sample_output.txt', 'w') as f:
         for e in embeddings:
-            f.write('['+' '.join(str(x) for x in e)+']')
-            f.write('\n')
+            f.write('['+' '.join(str(x) for x in e)+']\n')
 
 db = DBSCAN(eps=1, min_samples=3, metric='cosine', algorithm='brute').fit(embeddings)
 print(db)
