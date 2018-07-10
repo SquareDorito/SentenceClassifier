@@ -12,6 +12,8 @@ from sklearn import metrics
 
 import os.path
 
+np.set_printoptions(threshold='nan')
+
 # ======================================================= #
 #                Set paths to models here:                #
 # ======================================================= #
