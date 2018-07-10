@@ -31,7 +31,7 @@ def get_nn(index, num=3):
   e = embeddings[index]
   scores = sd.cdist([e], embeddings, "cosine")[0]
   scores1 = sd.cdist([e], embeddings, "euclidean")[0]
-  print(scores1)
+  #print(scores1)
   sorted_ids = np.argsort(scores)
   print("Input Sentence: ",data[index])
   print("Nearest Neighbors: ")
@@ -83,13 +83,13 @@ else:
         for e in embeddings:
             f.write('['+' '.join(str(x) for x in e)+']\n')
 
-print(len(embeddings))
-print(len(embeddings[0]))
-db = DBSCAN(eps=0.3, min_samples=2,metric='cosine').fit(embeddings)
+#print(len(embeddings))
+#print(len(embeddings[0]))
+db = DBSCAN(eps=0.2, min_samples=5,metric='cosine').fit(embeddings)
 core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
 core_samples_mask[db.core_sample_indices_] = True
 labels = db.labels_
-print(labels)
+#print(labels)
 n_clusters_ = len(set(labels)) - (1 if -1 else 0)
 print(n_clusters_)
 
