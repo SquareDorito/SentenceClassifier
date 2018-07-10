@@ -85,7 +85,7 @@ else:
 
 #print(len(embeddings))
 #print(len(embeddings[0]))
-db = DBSCAN(eps=0.2, min_samples=5,metric='cosine').fit(embeddings)
+db = DBSCAN(eps=0.3, min_samples=3,metric='cosine').fit(embeddings)
 core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
 core_samples_mask[db.core_sample_indices_] = True
 labels = db.labels_
