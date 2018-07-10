@@ -46,6 +46,11 @@ encoder.load_model(configuration.model_config(),
 #                Loading in movie dataset.                #
 # ======================================================= #
 embeddings=[]
+data = []
+with open(os.path.join(MR_DATA_DIR, 'rt-polarity.neg'), 'rb') as f:
+  data.extend([line.decode('latin-1').strip() for line in f])
+with open(os.path.join(MR_DATA_DIR, 'rt-polarity.pos'), 'rb') as f:
+  data.extend([line.decode('latin-1').strip() for line in f])
 
 if os.path.isfile('sample_output.txt'):
     print('Found output file. Using saved encodings...')
@@ -55,12 +60,6 @@ if os.path.isfile('sample_output.txt'):
             temp=[float(x) for x in temp]
             embeddings.append(temp)
 else:
-    data = []
-    with open(os.path.join(MR_DATA_DIR, 'rt-polarity.neg'), 'rb') as f:
-      data.extend([line.decode('latin-1').strip() for line in f])
-    with open(os.path.join(MR_DATA_DIR, 'rt-polarity.pos'), 'rb') as f:
-      data.extend([line.decode('latin-1').strip() for line in f])
-
     #print(data)
     embeddings = encoder.encode(data)
     print(len(embeddings))
@@ -78,3 +77,13 @@ labels = db.labels_
 print(labels)
 n_clusters_ = len(set(labels)) - (1 if -1 else 0)
 print(n_clusters_)
+
+def get_nn(index, num=3):
+  e = embeddings[index]
+  scores = sd.cdist([e], embeddings, "cosine")[0]
+  sorted_ids = np.argsort(scores)
+  print("Input Sentence: ",data[ind])
+  print("Nearest Neighbors: ")
+  for i in range(1, num + 1):
+    print(" %d. %s (%.3f)" %
+          (i, data[sorted_ids[i]], scores[sorted_ids[i]]))
