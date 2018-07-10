@@ -12,6 +12,8 @@ from sklearn import metrics
 
 import os.path
 
+np.set_printoptions(threshold=np.inf)
+
 # ======================================================= #
 #                Set paths to models here:                #
 # ======================================================= #
