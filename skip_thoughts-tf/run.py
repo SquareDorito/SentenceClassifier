@@ -102,8 +102,8 @@ with open('cluster_output.txt', 'w') as f:
     for key in cluster_dict:
         if key==-1:
             continue
-        f.write('============= Cluster '+str(key)+': =============')
-        for sentence in cluster_dict[key]:
-            f.write(sentence+'\n')
+        f.write('============= Cluster '+str(key)+': =============\n')
+        for j,sentence in enumerate(cluster_dict[key]):
+            f.write(str(j)+'. '+sentence+'\n')
 
 get_nn(0)
