@@ -51,7 +51,7 @@ if os.path.isfile('sample_output.txt'):
     print('Found output file. Using saved encodings...')
     with open('sample_output.txt', 'r') as f:
         for line in f:
-            temp=line.strip('[').strip(']').split(' ')
+            temp=line.strip('\n').strip('[').strip(']').split(' ')
             temp=[float(x) for x in temp]
             embeddings.append(temp)
 else:
