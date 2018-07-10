@@ -12,7 +12,7 @@ from sklearn import metrics
 
 import os.path
 
-np.set_printoptions(threshold='nan')
+np.set_printoptions(threshold=np.inf)
 
 # ======================================================= #
 #                Set paths to models here:                #
@@ -91,7 +91,7 @@ core_samples_mask[db.core_sample_indices_] = True
 labels = db.labels_
 print(labels)
 n_clusters_ = len(set(labels)) - (1 if -1 else 0)
-#print(n_clusters_)
+print(n_clusters_)
 
 cluster_dict={}
 for i,l in enumerate(labels):
@@ -102,10 +102,10 @@ for i,l in enumerate(labels):
 
 with open('cluster_output.txt', 'w') as f:
     for key in cluster_dict:
-        if key==-1
-    for e in embeddings:
-        f.write('['+' '.join(str(x) for x in e)+']\n')
-for key in cluster_dict:
-
+        if key==-1:
+            continue
+        f.write('============= Cluster '+str(key)+': =============')
+        for sentence in cluster_dict[key]:
+            f.write(sentence+'\n')
 
 get_nn(0)
