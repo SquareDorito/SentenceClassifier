@@ -70,26 +70,13 @@ else:
 
 print(len(embeddings))
 print(len(embeddings[0]))
-db = DBSCAN(eps=10, min_samples=3).fit(embeddings)
+db = DBSCAN(eps=0.3, min_samples=2,metric='cosine').fit(embeddings)
 core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
 core_samples_mask[db.core_sample_indices_] = True
 labels = db.labels_
 print(labels)
 n_clusters_ = len(set(labels)) - (1 if -1 else 0)
 print(n_clusters_)
-print('================== DBSCAN Clustering Results ==================')
-print('')
-print('Estimated number of clusters: %d' % n_clusters_)
-print("Homogeneity: %0.3f" % metrics.homogeneity_score(labels_true, labels))
-print("Completeness: %0.3f" % metrics.completeness_score(labels_true, labels))
-print("V-measure: %0.3f" % metrics.v_measure_score(labels_true, labels))
-print("Adjusted Rand Index: %0.3f"
-      % metrics.adjusted_rand_score(labels_true, labels))
-print("Adjusted Mutual Information: %0.3f"
-      % metrics.adjusted_mutual_info_score(labels_true, labels))
-print("Silhouette Coefficient: %0.3f"
-      % metrics.silhouette_score(X, labels))
-print('===============================================================')
 
 def get_nn(index, num=3):
   e = embeddings[index]
