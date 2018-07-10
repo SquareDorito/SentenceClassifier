@@ -71,10 +71,10 @@ else:
 
 print(len(embeddings))
 print(len(embeddings[0]))
-db = DBSCAN(eps=1, min_samples=3, metric='cosine', algorithm='brute').fit(embeddings)
+db = DBSCAN(eps=10, min_samples=3).fit(embeddings)
 core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
 core_samples_mask[db.core_sample_indices_] = True
 labels = db.labels_
 print(labels)
 n_clusters_ = len(set(labels)) - (1 if -1 else 0)
-print(n_clusters)
+print(n_clusters_)
