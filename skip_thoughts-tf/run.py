@@ -22,7 +22,7 @@ BI_MODEL_PATH = "skip_thoughts/pretrained/skip_thoughts_bi_2017_02_16/"
 #CHECKPOINT_PATH = "/path/to/model.ckpt-9999"
 # The following directory should contain files rt-polarity.neg and
 # rt-polarity.pos.
-MR_DATA_DIR = "rt-polaritydata/rt-polaritydata/"
+MR_DATA_DIR = "rt-polaritydata/"
 
 
 # ======================================================= #
@@ -51,7 +51,7 @@ if os.path.isfile('sample_output.txt'):
     print('Found output file. Using saved encodings...')
     with open('sample_output.txt', 'r') as f:
         for line in f:
-            temp=line.strip('[').strip(']').split(' ')
+		temp=line.strip('\n').strip('[').strip(']').split(' ')
             temp=[float(x) for x in temp]
             embeddings.append(temp)
 else:
