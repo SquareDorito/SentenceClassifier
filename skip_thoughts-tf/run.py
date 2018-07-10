@@ -94,6 +94,8 @@ print('===============================================================')
 def get_nn(index, num=3):
   e = embeddings[index]
   scores = sd.cdist([e], embeddings, "cosine")[0]
+  scores1 = sd.cdist([e], embeddings, "euclidean")[0]
+  print(scores1)
   sorted_ids = np.argsort(scores)
   print("Input Sentence: ",data[ind])
   print("Nearest Neighbors: ")
