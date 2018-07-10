@@ -22,7 +22,7 @@ BI_MODEL_PATH = "skip_thoughts/pretrained/skip_thoughts_bi_2017_02_16/"
 #CHECKPOINT_PATH = "/path/to/model.ckpt-9999"
 # The following directory should contain files rt-polarity.neg and
 # rt-polarity.pos.
-MR_DATA_DIR = "rt-polaritydata/rt-polaritydata/"
+MR_DATA_DIR = "rt-polaritydata/"
 
 
 # ======================================================= #
