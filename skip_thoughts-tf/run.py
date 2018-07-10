@@ -82,8 +82,10 @@ def get_nn(index, num=3):
   e = embeddings[index]
   scores = sd.cdist([e], embeddings, "cosine")[0]
   sorted_ids = np.argsort(scores)
-  print("Input Sentence: ",data[ind])
+  print("Input Sentence: ",data[index])
   print("Nearest Neighbors: ")
   for i in range(1, num + 1):
     print(" %d. %s (%.3f)" %
           (i, data[sorted_ids[i]], scores[sorted_ids[i]]))
+
+get_nn(0)
