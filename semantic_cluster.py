@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from InferSent.infersent_embedding import *
+#from InferSent.infersent_embedding import *
 from clustering.kmeans import *
 
 import matplotlib
@@ -7,10 +7,18 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 from matplotlib.text import Annotation
+from sklearn.cluster import DBSCAN
+from sklearn import metrics
 import argparse
 
 from sklearn.decomposition import PCA
-import skip_thoughts.skipthoughts as skipthoughts
+
+# Importing skip_thoughts_theano
+import skip_thoughts_theano.skipthoughts as skipthoughts_theano
+# Importing skip_thoughts_tf
+import skip_thoughts_tf.skip_thoughts as skipthoughts_tf
+
+
 
 class Annotation3D(Annotation):
     '''Annotate the point xyz with text s'''
@@ -47,38 +55,67 @@ def generate_colors(n):
         ret.append((r,g,b))
     return ret
 
-class SemanticCluster():
+class SemanticClusterModule():
 
     def __init__(self,args):
+        #support for command line args
         self.args=args
-
         self.sentences=[]
-        with open('samples.txt') as f:
+        self.model=None
+        self.encoder=None
+        self.embeddings=[]
+        self.principal_components=[]
+        #self.principal_components=self.get_nd_data(3)
+        #self.perform_clustering()
+        #self.drawGraphs()
+        self.algo_name=""
+
+    def load_data(self, file):
+        with open(file) as f:
             for line in f:
                 self.sentences.append(line.strip())
 
-        if self.args.embedding_algo=='infersent':
-            self.ie=InfersentEmbedding(500000, 'InferSent/dataset/GloVe/glove.840B.300d.txt',self.sentences)
-            self.embeddings=self.ie.infersent_embed()
-        elif self.args.embedding_algo=='skip_thoughts':
-            self.st_model = skipthoughts.load_model()
-            self.st_encoder = skipthoughts.Encoder(self.st_model)
-            self.embeddings=self.st_encoder.encode(self.sentences)
-        print('Done with embedding...starting clustering.')
-        self.principal_components=self.get_nd_data(3)
-        self.perform_clustering()
-        self.drawGraphs()
+    def load_model(self, algo_name):
+        self.algo_name=algo_name
+        if algo_name=='infersent':
+            # Outdated, no longer using infersent embedding technique.
+            # self.ie=InfersentEmbedding(500000, 'InferSent/dataset/GloVe/glove.840B.300d.txt',self.sentences)
+            # self.embeddings=self.ie.infersent_embed()
+            pass
+        elif algo_name=='skipthoughts_theano':
+            self.model = skipthoughts_theano.load_model()
+            self.encoder = skipthoughts_theano.Encoder(self.model)
+        elif algo_name=='skipthoughts_tf':
+            UNI_MODEL_PATH = "skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/"
+            self.encoder=skipthoughts_tf.encoder_manager.EncoderManager()
+            self.encoder.load_model(skipthoughts_tf.configuration.model_config(),
+                       vocabulary_file=UNI_MODEL_PATH+"vocab.txt",
+                       embedding_matrix_file=UNI_MODEL_PATH+"embeddings.npy",
+                       checkpoint_path=UNI_MODEL_PATH+"model.ckpt-501424")
+        else:
+            print("Invalid algo name, please try again with either: skipthoughts_tf, skip_thoughts_theano.")
+            return False
+        return True
 
-    def get_nd_data(self, k):
+    def encode(self):
+        if not self.encoder:
+            print("Please load a model before attempting to encode.")
+            return None
+        self.embeddings=self.encoder.encode(self.sentences)
+        return self.embeddings
+
+    def get_nd_data(self, k, output_file=False):
         pca = PCA(n_components=k)
-        principal_components=pca.fit_transform(self.embeddings)
+        self.principal_components=pca.fit_transform(self.embeddings)
 
-        with open('samples_output_pca3.txt', 'w') as f:
-            for pc in principal_components:
-                f.write('['+' '.join(str(x) for x in pc)+']')
-                f.write('\n')
+        if output_file:
+            # Print 3D embeddings to file for testing
+            with open('samples_output_pca3.txt', 'w') as f:
+                for pc in self.principal_components:
+                    f.write('['+' '.join(str(x) for x in pc)+']')
+                    f.write('\n')
 
-        return principal_components
+        return self.principal_components
 
     def drawGraphs(self):
         # ==============
@@ -120,13 +157,35 @@ class SemanticCluster():
 
         plt.show()
 
-    def perform_clustering(self):
-        #if args.clustering_algo=='kmeans':
-        a=KMeans()
-        self.results=a.kmeans(self.principal_components,int(self.args.k),1,'forgy')
-        #elif args.clustering_algo=="dbscan":
-        #    # TODO: implement DBSCAN if needed
-    #        return
+    def perform_clustering(self, clustering_algo):
+        if clustering_algo=='kmeans':
+            a=KMeans()
+            self.clustering_results=a.kmeans(self.principal_components,int(self.args.k),1,'forgy')
+            return self.clustering_results
+        elif clustering_algo=="dbscan":
+            db = DBSCAN(eps=0.3, min_samples=3,metric='cosine').fit(self.embeddings)
+            core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+            core_samples_mask[db.core_sample_indices_] = True
+            labels = db.labels_
+            #print(labels)
+            n_clusters_ = len(set(labels)) - (1 if -1 else 0)
+            print(n_clusters_)
+
+            self.cluster_dict={}
+            for i,l in enumerate(labels):
+                try:
+                    self.cluster_dict[l].append(self.sentences[i])
+                except:
+                    self.cluster_dict[l]=[self.sentences[i]]
+
+            with open('cluster_output.txt', 'w') as f:
+                for key in self.cluster_dict:
+                    if key==-1:
+                        continue
+                    f.write('============= Cluster '+str(key)+': =============\n')
+                    for j,sentence in enumerate(self.cluster_dict[key]):
+                        f.write(str(j)+'. '+sentence+'\n')
+            return self.cluster_dict
 
 def main():
     parser = argparse.ArgumentParser(description='Sentiment Cluster.')
@@ -136,7 +195,7 @@ def main():
     parser.add_argument('--eps', nargs='?', default=3,help='Maximum distance for two samples to be in same cluster.')
     parser.add_argument('--min_size', nargs='?', default=3,help='Minimum cluster size for DBSCAN.')
     args = parser.parse_args()
-    sc=SemanticCluster(args)
+    sc=SemanticClusterModule(args)
 
 
 if __name__== "__main__":

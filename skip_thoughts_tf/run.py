@@ -17,7 +17,7 @@ np.set_printoptions(threshold=np.inf)
 # ======================================================= #
 #                Set paths to models here:                #
 # ======================================================= #
-UNI_MODEL_PATH = "skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/"
+
 BI_MODEL_PATH = "skip_thoughts/pretrained/skip_thoughts_bi_2017_02_16/"
 #VOCAB_FILE = BIDIR_MODEL_PATH + "vocab.txt"
 #EMBEDDING_MATRIX_FILE = BIDIR_MODEL_PATH + "embeddings.npy"
