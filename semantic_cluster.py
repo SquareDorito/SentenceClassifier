@@ -18,8 +18,6 @@ import skip_thoughts_theano.skipthoughts as skipthoughts_theano
 # Importing skip_thoughts_tf
 import skip_thoughts_tf.skip_thoughts as skipthoughts_tf
 
-
-
 class Annotation3D(Annotation):
     '''Annotate the point xyz with text s'''
 
@@ -137,8 +135,8 @@ class SemanticClusterModule():
         # Second subplot
         # ==============
         ax = fig.add_subplot(1, 2, 2, projection='3d')
-        clusters=self.results[1]
-        centers=self.results[0]
+        clusters={} #self.results[1]
+        centers={} #self.results[0]
         colors=generate_colors(int(self.args.k))
         colors=[(x[0]/255.0,x[1]/255.0,x[2]/255.0) for x in colors]
 
