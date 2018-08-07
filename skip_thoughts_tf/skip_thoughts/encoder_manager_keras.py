@@ -30,5 +30,46 @@ class EncoderManager(object):
         self.encoders.append(encoder)
         self.sessions.append(tf_sess)
 
-test=EncoderManager()
-test.load_model(None,'pretrained/skip_thoughts_uni_2017_02_02/vocab.txt',None,None)
+    def encode(self,
+             data,
+             use_norm=True,
+             verbose=False,
+             batch_size=128,
+             use_eos=False):
+    """Encodes a sequence of sentences as skip-thought vectors.
+
+    Args:
+      data: A list of input strings.
+      use_norm: If True, normalize output skip-thought vectors to unit L2 norm.
+      verbose: Whether to log every batch.
+      batch_size: Batch size for the RNN encoders.
+      use_eos: If True, append the end-of-sentence word to each input sentence.
+
+    Returns:
+      thought_vectors: A list of numpy arrays corresponding to 'data'.
+
+    Raises:
+      ValueError: If called before calling load_encoder.
+    """
+    if not self.encoders:
+      raise ValueError(
+          "Must call load_model at least once before calling encode.")
+
+    encoded = []
+    for encoder, sess in zip(self.encoders, self.sessions):
+      encoded.append(
+          np.array(
+              encoder.encode(
+                  sess,
+                  data,
+                  use_norm=use_norm,
+                  verbose=verbose,
+                  batch_size=batch_size,
+                  use_eos=use_eos)))
+
+    return np.concatenate(encoded, axis=1)
+
+  def close(self):
+    """Closes the active TensorFlow & Keras sessions."""
+    for sess in self.sessions:
+      sess.close()
