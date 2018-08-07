@@ -1,363 +1,188 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Skip-Thoughts model for learning sentence vectors.
+'''
+Basic implementation of Skip-Thoughts model for calculating sentence embeddings.
 
-The model is based on the paper:
+Keras implementation by @KenNoh
+'''
 
-  "Skip-Thought Vectors"
-  Ryan Kiros, Yukun Zhu, Ruslan Salakhutdinov, Richard S. Zemel,
-  Antonio Torralba, Raquel Urtasun, Sanja Fidler.
-  https://papers.nips.cc/paper/5950-skip-thought-vectors.pdf
+import recurrentshop
+import seq2seq
+from recurrentshop.cells import LSTMCell
+from seq2seq import LSTMDecoderCell
+from seq2seq import LSTMCell
+from recurrentshop.engine import RecurrentContainer
+from keras.layers import Input, Embedding, Dropout, TimeDistributed, Dense, Activation, Lambda
+from keras.layers import add, multiply, concatenate
+from keras import backend as K
+from keras.models import Model
+
+def build_decoder(dropout, embed_dim, output_length, output_dim, peek=False, unroll=False):
+    decoder = RecurrentContainer(
+        readout='add' if peek else 'readout_only', output_length=output_length, unroll=unroll, decode=True,
+        input_length=shape[1]
+    )
+    # for i in range(depth[1]):
+    decoder.add(Dropout(dropout, batch_input_shape=(None, embed_dim)))
+    decoder.add(LSTMDecoderCell(output_dim=output_dim, hidden_dim=embed_dim, batch_input_shape=(shape[0], embed_dim)))
+
+    return decoder
+
+def SkipThoughtModel(
+        sent_len,
+        vocab_size,
+        embed_dims,
+        output_length,
+        output_dim,
+        dropout=0.4,
+        unroll=False,
+        teacher_force=False):
+    input_sent = Input(shape=(sent_len, vocab_size), dtype=K.floatx())
+    input_sent._keras_history[0].supports_masking = True
+
+    encoder = RecurrentContainer(
+        readout=True, input_length=sent_len, unroll=unroll, stateful=False
+    )
+    # for i in range(depth[0]):
+    encoder.add(LSTMCell(embed_dims, batch_input_shape=(None, embed_dims)))
+    encoder.add(Dropout(dropout))
+
+    dense1 = TimeDistributed(Dense(embed_dims))
+    dense1.supports_masking = True
+    dense2 = Dense(embed_dims)
+
+    encoded_seq = dense1(input)
+    encoded_seq = encoder(encoded_seq)
+
+    states = [None] * 2
+    encoded_seq = dense2(encoded_seq)
+    inputs = [input]
+    if teacher_force:
+        truth_tensor_prev = Input(batch_shape=(None, output_length, output_dim))
+        truth_tensor_prev._keras_history[0].supports_masking = True
+        truth_tensor_next = Input(batch_shape=(None, output_length, output_dim))
+        truth_tensor_next._keras_history[0].supports_masking = True
+        inputs += [truth_tensor_prev, truth_tensor_next]
+
+    prev_decoder = build_decoder(dropout=dropout, unroll=unroll, output_length=output_length)
+    next_decoder = build_decoder()
+    prev_decoded_seq = prev_decoder(
+        {'input': encoded_seq, 'ground_truth': inputs[1] if teacher_force else None, 'initial_readout': encoded_seq,
+         'states': states})
+
+    next_decoded_seq = next_decoder(
+        {'input': encoded_seq, 'ground_truth': inputs[2] if teacher_force else None, 'initial_readout': encoded_seq,
+         'states': states})
+
+    model = Model(inputs, [prev_decoded_seq, next_decoded_seq])
+    model.encoder = encoder
+    model.decoders = [prev_decoder, next_decoder]
+    return model
 
 
-Keras implementation by @SquareDorito (Ken Noh)
+def SkipThoughtModel_new(output_dim, output_length, batch_input_shape=None,
+            input_shape=None, batch_size=None, input_dim=None, input_length=None,
+            hidden_dim=None, depth=1, broadcast_state=True, unroll=False,
+            stateful=False, inner_broadcast_state=True, teacher_force=False,
+            peek=False, dropout=0.):
 
-"""
+    '''
+    Seq2seq model based on [1] and [2]. You can switch between [1] based model and [2]
+    based model using the peek argument.(peek = True for [2], peek = False for [1]).
+    When peek = True, the decoder gets a 'peek' at the context vector at every timestep.
 
-import tensorflow as tf
-from tensorflow import keras
+    Arguments:
+    - output_dim : Required output dimension.
+    - hidden_dim : The dimension of the internal representations of the model.
+    - output_length : Length of the required output sequence.
+    - depth : Used to create a deep Seq2seq model. For example, if depth = 3,
+                    there will be 3 LSTMs on the enoding side and 3 LSTMs on the
+                    decoding side. You can also specify depth as a tuple. For example,
+                    if depth = (4, 5), 4 LSTMs will be added to the encoding side and
+                    5 LSTMs will be added to the decoding side.
+    - broadcast_state : Specifies whether the hidden state from encoder should be
+                                      transfered to the deocder.
+    - inner_broadcast_state : Specifies whether hidden states should be propogated
+                                                    throughout the LSTM stack in deep models.
+    - peek : Specifies if the decoder should be able to peek at the context vector
+               at every timestep.
+    - dropout : Dropout probability in between layers.
 
-from skip_thoughts.ops import gru_cell
-from skip_thoughts.ops import input_ops
+    Returns: Keras model to be trained.
+    '''
 
-
-def random_orthonormal_initializer(shape, dtype=tf.float32,
-                                   partition_info=None):  # pylint: disable=unused-argument
-  """Variable initializer that produces a random orthonormal matrix."""
-  if len(shape) != 2 or shape[0] != shape[1]:
-    raise ValueError("Expecting square shape, got %s" % shape)
-  _, u, _ = tf.svd(tf.random_normal(shape, dtype=dtype), full_matrices=True)
-  return u
-
-
-class SkipThoughtsModel(object):
-  """Skip-thoughts model."""
-
-  def __init__(self, config, mode="train", input_reader=None):
-    """Basic setup. The actual TensorFlow graph is constructed in build().
-
-    Args:
-      config: Object containing configuration parameters.
-      mode: "train", "eval" or "encode".
-      input_reader: Subclass of tf.ReaderBase for reading the input serialized
-        tf.Example protocol buffers. Defaults to TFRecordReader.
-
-    Raises:
-      ValueError: If mode is invalid.
-    """
-    if mode not in ["train", "eval", "encode"]:
-      raise ValueError("Unrecognized mode: %s" % mode)
-
-    self.config = config
-    self.mode = mode
-    self.reader = input_reader if input_reader else tf.TFRecordReader()
-
-    # Initializer used for non-recurrent weights.
-    self.uniform_initializer = keras.initializers.RandomUniform(
-        minval=-self.config.uniform_init_scale,
-        maxval=self.config.uniform_init_scale)
-
-    # Input sentences represented as sequences of word ids. "encode" is the
-    # source sentence, "decode_pre" is the previous sentence and "decode_post"
-    # is the next sentence.
-    # Each is an int64 Tensor with  shape [batch_size, padded_length].
-    self.encode_ids = None
-    self.decode_pre_ids = None
-    self.decode_post_ids = None
-
-    # Boolean masks distinguishing real words (1) from padded words (0).
-    # Each is an int32 Tensor with shape [batch_size, padded_length].
-    self.encode_mask = None
-    self.decode_pre_mask = None
-    self.decode_post_mask = None
-
-    # Input sentences represented as sequences of word embeddings.
-    # Each is a float32 Tensor with shape [batch_size, padded_length, emb_dim].
-    self.encode_emb = None
-    self.decode_pre_emb = None
-    self.decode_post_emb = None
-
-    # The output from the sentence encoder.
-    # A float32 Tensor with shape [batch_size, num_gru_units].
-    self.thought_vectors = None
-
-    # The cross entropy losses and corresponding weights of the decoders. Used
-    # for evaluation.
-    self.target_cross_entropy_losses = []
-    self.target_cross_entropy_loss_weights = []
-
-    # The total loss to optimize.
-    self.total_loss = None
-
-  def build_inputs(self):
-    """Builds the ops for reading input data.
-
-    Outputs:
-      self.encode_ids
-      self.decode_pre_ids
-      self.decode_post_ids
-      self.encode_mask
-      self.decode_pre_mask
-      self.decode_post_mask
-    """
-    if self.mode == "encode":
-      # Word embeddings are fed from an external vocabulary which has possibly
-      # been expanded (see vocabulary_expansion.py).
-      encode_ids = None
-      decode_pre_ids = None
-      decode_post_ids = None
-      encode_mask = keras.backend.placeholder(dtype='int8', (None, None), name="encode_mask")
-      decode_pre_mask = None
-      decode_post_mask = None
-    else:
-      # Prefetch serialized tf.Example protos.
-      input_queue = input_ops.prefetch_input_data(
-          self.reader,
-          self.config.input_file_pattern,
-          shuffle=self.config.shuffle_input_data,
-          capacity=self.config.input_queue_capacity,
-          num_reader_threads=self.config.num_input_reader_threads)
-
-      # Deserialize a batch.
-      serialized = input_queue.dequeue_many(self.config.batch_size)
-      encode, decode_pre, decode_post = input_ops.parse_example_batch(
-          serialized)
-
-      encode_ids = encode.ids
-      decode_pre_ids = decode_pre.ids
-      decode_post_ids = decode_post.ids
-
-      encode_mask = encode.mask
-      decode_pre_mask = decode_pre.mask
-      decode_post_mask = decode_post.mask
-
-    self.encode_ids = encode_ids
-    self.decode_pre_ids = decode_pre_ids
-    self.decode_post_ids = decode_post_ids
-
-    self.encode_mask = encode_mask
-    self.decode_pre_mask = decode_pre_mask
-    self.decode_post_mask = decode_post_mask
-
-  def build_word_embeddings(self):
-    """Builds the word embeddings.
-
-    Inputs:
-      self.encode_ids
-      self.decode_pre_ids
-      self.decode_post_ids
-
-    Outputs:
-      self.encode_emb
-      self.decode_pre_emb
-      self.decode_post_emb
-    """
-    if self.mode == "encode":
-      # Word embeddings are fed from an external vocabulary which has possibly
-      # been expanded (see vocabulary_expansion.py).
-      encode_emb = keras.backend.placeholder(dtype='float32', (
-          None, None, self.config.word_embedding_dim), "encode_emb")
-      # No sequences to decode.
-      decode_pre_emb = None
-      decode_post_emb = None
-    else:
-      word_emb = tf.get_variable(
-          name="word_embedding",
-          shape=[self.config.vocab_size, self.config.word_embedding_dim],
-          initializer=self.uniform_initializer)
-
-      encode_emb = tf.nn.embedding_lookup(word_emb, self.encode_ids)
-      decode_pre_emb = tf.nn.embedding_lookup(word_emb, self.decode_pre_ids)
-      decode_post_emb = tf.nn.embedding_lookup(word_emb, self.decode_post_ids)
-
-    self.encode_emb = encode_emb
-    self.decode_pre_emb = decode_pre_emb
-    self.decode_post_emb = decode_post_emb
-
-  def _initialize_gru_cell(self, num_units):
-    """Initializes a GRU cell.
-
-    The Variables of the GRU cell are initialized in a way that exactly matches
-    the skip-thoughts paper: recurrent weights are initialized from random
-    orthonormal matrices and non-recurrent weights are initialized from random
-    uniform matrices.
-
-    Args:
-      num_units: Number of output units.
-
-    Returns:
-      cell: An instance of RNNCell with variable initializers that match the
-        skip-thoughts paper.
-    """
-    return gru_cell.LayerNormGRUCell(
-        num_units,
-        w_initializer=self.uniform_initializer,
-        u_initializer=random_orthonormal_initializer,
-        b_initializer=tf.constant_initializer(0.0))
-
-  def build_encoder(self):
-    """Builds the sentence encoder.
-
-    Inputs:
-      self.encode_emb
-      self.encode_mask
-
-    Outputs:
-      self.thought_vectors
-
-    Raises:
-      ValueError: if config.bidirectional_encoder is True and config.encoder_dim
-        is odd.
-    """
-    with tf.variable_scope("encoder") as scope:
-      length = tf.to_int32(tf.reduce_sum(self.encode_mask, 1), name="length")
-
-      if self.config.bidirectional_encoder:
-        if self.config.encoder_dim % 2:
-          raise ValueError(
-              "encoder_dim must be even when using a bidirectional encoder.")
-        num_units = self.config.encoder_dim // 2
-        cell_fw = self._initialize_gru_cell(num_units)  # Forward encoder
-        cell_bw = self._initialize_gru_cell(num_units)  # Backward encoder
-        _, states = tf.nn.bidirectional_dynamic_rnn(
-            cell_fw=cell_fw,
-            cell_bw=cell_bw,
-            inputs=self.encode_emb,
-            sequence_length=length,
-            dtype=tf.float32,
-            scope=scope)
-        thought_vectors = tf.concat(states, 1, name="thought_vectors")
+    if isinstance(depth, int):
+      depth = (depth, depth)
+    if batch_input_shape:
+      shape = batch_input_shape
+    elif input_shape:
+      shape = (batch_size,) + input_shape
+    elif input_dim:
+      if input_length:
+        shape = (batch_size,) + (input_length,) + (input_dim,)
       else:
-        cell = self._initialize_gru_cell(self.config.encoder_dim)
-        _, state = tf.nn.dynamic_rnn(
-            cell=cell,
-            inputs=self.encode_emb,
-            sequence_length=length,
-            dtype=tf.float32,
-            scope=scope)
-        # Use an identity operation to name the Tensor in the Graph.
-        thought_vectors = tf.identity(state, name="thought_vectors")
+        shape = (batch_size,) + (None,) + (input_dim,)
+    else:
+      # TODO Proper error message
+      raise TypeError
+    if hidden_dim is None:
+      hidden_dim = output_dim
 
-    self.thought_vectors = thought_vectors
+    encoder = RecurrentSequential(readout=True, state_sync=inner_broadcast_state,
+                                  unroll=unroll, stateful=stateful,
+                                  return_states=broadcast_state)
+    for _ in range(depth[0]):
+      encoder.add(LSTMCell(hidden_dim, batch_input_shape=(shape[0], hidden_dim)))
+      encoder.add(Dropout(dropout))
 
-  def _build_decoder(self, name, embeddings, targets, mask, initial_state,
-                     reuse_logits):
-    """Builds a sentence decoder.
+    dense1 = TimeDistributed(Dense(hidden_dim))
+    dense1.supports_masking = True
+    dense2 = Dense(output_dim)
 
-    Args:
-      name: Decoder name.
-      embeddings: Batch of sentences to decode; a float32 Tensor with shape
-        [batch_size, padded_length, emb_dim].
-      targets: Batch of target word ids; an int64 Tensor with shape
-        [batch_size, padded_length].
-      mask: A 0/1 Tensor with shape [batch_size, padded_length].
-      initial_state: Initial state of the GRU. A float32 Tensor with shape
-        [batch_size, num_gru_cells].
-      reuse_logits: Whether to reuse the logits weights.
-    """
-    # Decoder RNN.
-    cell = self._initialize_gru_cell(self.config.encoder_dim)
-    with tf.variable_scope(name) as scope:
-      # Add a padding word at the start of each sentence (to correspond to the
-      # prediction of the first word) and remove the last word.
-      decoder_input = tf.pad(
-          embeddings[:, :-1, :], [[0, 0], [1, 0], [0, 0]], name="input")
-      length = tf.reduce_sum(mask, 1, name="length")
-      decoder_output, _ = tf.nn.dynamic_rnn(
-          cell=cell,
-          inputs=decoder_input,
-          sequence_length=length,
-          initial_state=initial_state,
-          scope=scope)
+    decoder_next = RecurrentSequential(readout='add' if peek else 'readout_only',
+                                  state_sync=inner_broadcast_state, decode=True,
+                                  output_length=output_length, unroll=unroll,
+                                  stateful=stateful, teacher_force=teacher_force)
+    decoder_prev = RecurrentSequential(readout='add' if peek else 'readout_only',
+                                  state_sync=inner_broadcast_state, decode=True,
+                                  output_length=output_length, unroll=unroll,
+                                  stateful=stateful, teacher_force=teacher_force)
 
-    # Stack batch vertically.
-    decoder_output = tf.reshape(decoder_output, [-1, self.config.encoder_dim])
-    targets = tf.reshape(targets, [-1])
-    weights = tf.to_float(tf.reshape(mask, [-1]))
+    for _ in range(depth[1]):
+      decoder_next.add(Dropout(dropout, batch_input_shape=(shape[0], output_dim)))
+      decoder_next.add(LSTMDecoderCell(output_dim=output_dim, hidden_dim=hidden_dim,
+                                  batch_input_shape=(shape[0], output_dim)))
 
-    # Logits.
-    with tf.variable_scope("logits", reuse=reuse_logits) as scope:
-      logits = tf.contrib.layers.fully_connected(
-          inputs=decoder_output,
-          num_outputs=self.config.vocab_size,
-          activation_fn=None,
-          weights_initializer=self.uniform_initializer,
-          scope=scope)
+      decoder_prev.add(Dropout(dropout, batch_input_shape=(shape[0], output_dim)))
+      decoder_prev.add(LSTMDecoderCell(output_dim=output_dim, hidden_dim=hidden_dim,
+                                    batch_input_shape=(shape[0], output_dim)))                          
 
-    losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=targets, logits=logits)
-    batch_loss = tf.reduce_sum(losses * weights)
-    tf.losses.add_loss(batch_loss)
+    _input = Input(batch_shape=shape)
+    _input._keras_history[0].supports_masking = True
+    encoded_seq = dense1(_input)
+    encoded_seq = encoder(encoded_seq)
+    if broadcast_state:
+      assert type(encoded_seq) is list
+      states = encoded_seq[-2:]
+      encoded_seq = encoded_seq[0]
+    else:
+      states = None
+    encoded_seq = dense2(encoded_seq)
+    inputs = [_input]
+    if teacher_force:
+      truth_tensor_next = Input(batch_shape=(shape[0], output_length, output_dim))
+      truth_tensor_next._keras_history[0].supports_masking = True
+      truth_tensor_prev = Input(batch_shape=(None, output_length, output_dim))
+      truth_tensor_prev._keras_history[0].supports_masking = True
+      inputs += [truth_tensor_prev,truth_tensor_next]
 
-    tf.summary.scalar("losses/" + name, batch_loss)
+    prev_decoded_seq = decoder_prev(encoded_seq,
+                          ground_truth=inputs[1] if teacher_force else None,
+                          initial_readout=encoded_seq, initial_state=states)
 
-    self.target_cross_entropy_losses.append(losses)
-    self.target_cross_entropy_loss_weights.append(weights)
-
-  def build_decoders(self):
-    """Builds the sentence decoders.
-
-    Inputs:
-      self.decode_pre_emb
-      self.decode_post_emb
-      self.decode_pre_ids
-      self.decode_post_ids
-      self.decode_pre_mask
-      self.decode_post_mask
-      self.thought_vectors
-
-    Outputs:
-      self.target_cross_entropy_losses
-      self.target_cross_entropy_loss_weights
-    """
-    if self.mode != "encode":
-      # Pre-sentence decoder.
-      self._build_decoder("decoder_pre", self.decode_pre_emb,
-                          self.decode_pre_ids, self.decode_pre_mask,
-                          self.thought_vectors, False)
-
-      # Post-sentence decoder. Logits weights are reused.
-      self._build_decoder("decoder_post", self.decode_post_emb,
-                          self.decode_post_ids, self.decode_post_mask,
-                          self.thought_vectors, True)
-
-  def build_loss(self):
-    """Builds the loss Tensor.
-
-    Outputs:
-      self.total_loss
-    """
-    if self.mode != "encode":
-      total_loss = tf.losses.get_total_loss()
-      tf.summary.scalar("losses/total", total_loss)
-
-      self.total_loss = total_loss
-
-  def build_global_step(self):
-    """Builds the global step Tensor.
-
-    Outputs:
-      self.global_step
-    """
-    self.global_step = tf.train.create_global_step()
-
-  def build(self):
-    """Creates all ops for training, evaluation or encoding."""
-    self.build_inputs()
-    self.build_word_embeddings()
-    self.build_encoder()
-    self.build_decoders()
-    self.build_loss()
-    self.build_global_step()
+    next_decoded_seq = decoder_next(encoded_seq,
+                          ground_truth=inputs[2] if teacher_force else None,
+                          initial_readout=encoded_seq, initial_state=states)
+    
+    model = Model(inputs, [prev_decoded_seq,next_decoded_seq])
+    model.encoder = encoder
+    model.decoder = [decoder_prev,decoder_next]
+    return model

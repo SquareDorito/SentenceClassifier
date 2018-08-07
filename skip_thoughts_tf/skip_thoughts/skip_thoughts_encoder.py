@@ -36,6 +36,7 @@ import nltk
 import nltk.tokenize
 import numpy as np
 import tensorflow as tf
+from tensorflow import keras
 
 from skip_thoughts import skip_thoughts_model
 from skip_thoughts.data import special_words

@@ -1,8 +1,6 @@
 """
-
 Input ops.
-Implementation by @SquareDorito (Ken Noh)
-
+Implementation partially in Keras by @Ken Noh
 """
 
 from __future__ import absolute_import

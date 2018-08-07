@@ -20,11 +20,11 @@ from __future__ import print_function
 
 
 import tensorflow as tf
+from tensorflow import keras
 
 _layer_norm = tf.contrib.layers.layer_norm
 
-
-class LayerNormGRUCell(tf.contrib.rnn.RNNCell):
+class LayerNormGRUCell(keras.layers.RNN):
   """GRU cell with layer normalization.
 
   The layer normalization implementation is based on:
@@ -33,6 +33,8 @@ class LayerNormGRUCell(tf.contrib.rnn.RNNCell):
 
   "Layer Normalization"
   Jimmy Lei Ba, Jamie Ryan Kiros, Geoffrey E. Hinton
+
+  Keras implementation by @Ken Noh
   """
 
   def __init__(self,
