@@ -1,4 +1,3 @@
-#!/usr/bin/python
 #from InferSent.infersent_embedding import *
 from clustering.kmeans import *
 

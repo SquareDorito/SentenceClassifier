@@ -9,7 +9,7 @@ import seq2seq
 from recurrentshop.cells import LSTMCell
 from seq2seq import LSTMDecoderCell
 from seq2seq import LSTMCell
-from recurrentshop.engine import RecurrentContainer
+from recurrentshop.engine import RecurrentContainer, RecurrentSequential
 from keras.layers import Input, Embedding, Dropout, TimeDistributed, Dense, Activation, Lambda
 from keras.layers import add, multiply, concatenate
 from keras import backend as K
